@@ -1,7 +1,7 @@
 import socket
 import threading
 
-class ChatServer:
+class TcpServer:
     def __init__(self):
         self.clients = {}
         self.lock = threading.Lock()
@@ -75,5 +75,5 @@ class ChatServer:
             server_socket.close()
 
 if __name__ == "__main__":
-    chat_server = ChatServer()
-    chat_server.start()
+    tcp_server = TcpServer()
+    tcp_server.start()
