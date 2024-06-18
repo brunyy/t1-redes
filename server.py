@@ -1,7 +1,7 @@
 import socket
 import os
 import hashlib
-from packet import Packet, PACKET_SIZE, MESSAGE_TYPE_ACK, MESSAGE_TYPE_FIN, MESSAGE_TYPE_SYN, MESSAGE_TYPE_SYN_ACK
+from packet import *
 
 SERVER_IP = "127.0.0.1"
 SERVER_PORT = 12345
@@ -34,7 +34,9 @@ def server(file_path):
         packet = Packet.from_bytes(packet_bytes)
 
         if packet.message_type == MESSAGE_TYPE_FIN:
-            print("Received FIN, closing connection")
+            print("Received FIN, sending FIN_ACK and closing connection")
+            fin_ack = Packet(MESSAGE_TYPE_FIN_ACK, 1)
+            sock.sendto(fin_ack.to_bytes(), addr)
             break
 
         if packet.is_corrupted():

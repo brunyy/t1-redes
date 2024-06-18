@@ -10,6 +10,7 @@ MESSAGE_TYPE_ACK = 0x02
 MESSAGE_TYPE_FIN = 0x03
 MESSAGE_TYPE_SYN = 0x04
 MESSAGE_TYPE_SYN_ACK = 0x05
+MESSAGE_TYPE_FIN_ACK = 0x06
 
 class Packet:
     def __init__(self, message_type, seq_num, data=b''):

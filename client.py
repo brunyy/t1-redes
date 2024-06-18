@@ -1,7 +1,7 @@
 import socket
 import time
 import random
-from packet import Packet, PACKET_SIZE, DATA_SIZE, MESSAGE_TYPE_DATA, MESSAGE_TYPE_ACK, MESSAGE_TYPE_FIN, MESSAGE_TYPE_SYN, MESSAGE_TYPE_SYN_ACK
+from packet import *
 
 # Constantes de configuração
 SERVER_IP = "127.0.0.1"
@@ -111,5 +111,16 @@ def client(file_path):
     # Envio do pacote de encerramento da conexão
     fin_packet = Packet(MESSAGE_TYPE_FIN, 0)
     sock.sendto(fin_packet.to_bytes(), (SERVER_IP, SERVER_PORT))
+    # Aguardar FIN_ACK
+    fin_ack_packet, _ = sock.recvfrom(PACKET_SIZE)
+    fin_ack = Packet.from_bytes(fin_ack_packet)
+    if fin_ack.message_type == MESSAGE_TYPE_FIN_ACK:
+        print("FIN_ACK received, closing connection.")
+        ack_packet = Packet(MESSAGE_TYPE_ACK, 1)
+        sock.sendto(ack_packet.to_bytes(), (SERVER_IP, SERVER_PORT))
+        print("Sent ACK, connection termination confirmed.")
+
+
+
     print("Connection closed")
     sock.close()
