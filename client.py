@@ -9,7 +9,7 @@ SERVER_PORT = 12345
 CLIENT_PORT = 54321
 TIMEOUT = 2  # Timeout em segundos
 MAX_RETRIES = 5  # Número máximo de tentativas de retransmissão
-LOSS_PROBABILITY = 0.1  # Probabilidade de perda de pacotes (para simulação de erros)
+LOSS_PROBABILITY = 0.1  # Probabilidade de perda ou corrompimento de pacotes (para simulação de erros)
 
 # Estados do congestionamento
 SLOW_START = 0
@@ -66,7 +66,15 @@ def client(file_path):
                 sock.sendto(packet.to_bytes(), (SERVER_IP, SERVER_PORT))
                 print(f"Sent packet {next_seq_num}")
             else:
-                print(f"Simulating loss for packet {next_seq_num}")
+                print(f"Simulating loss or corruption for packet {next_seq_num}")
+                if random.random() >= 0.5:
+                    print(f"Lost packet {next_seq_num}")
+                    continue
+                else:
+                    # Simula corrupção de pacote
+                    packet.data = b'\0' * DATA_SIZE
+                    sock.sendto(packet.to_bytes(), (SERVER_IP, SERVER_PORT))
+                    print(f"Sent corrupted packet {next_seq_num}")
 
             window_packets.append(packet)
             next_seq_num += 1
@@ -91,7 +99,7 @@ def client(file_path):
                             cwnd += 1
 
         except socket.timeout:
-            # Timeout: retransmit all packets in the window
+            # Timeout: retransmite todos os pacotes da janela
             print("Timeout, retransmitting packets")
             next_seq_num = base
             cwnd = INITIAL_CWND
