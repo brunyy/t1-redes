@@ -61,6 +61,7 @@ def client(file_path):
             end = start + DATA_SIZE
             data = file_data[start:end]
             packet = Packet(MESSAGE_TYPE_DATA, next_seq_num, data)
+            print(len(packet.to_bytes()))
 
             if random.random() >= LOSS_PROBABILITY:
                 sock.sendto(packet.to_bytes(), (SERVER_IP, SERVER_PORT))

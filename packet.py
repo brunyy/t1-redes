@@ -2,7 +2,7 @@ import struct
 import random
 
 PACKET_SIZE = 10
-DATA_SIZE = 5  # Tamanho dos dados em bytes (bytes 6 a 10), restante é o cabeçalho
+DATA_SIZE = 6  # Tamanho dos dados em bytes (bytes 5 a 10), restante é o cabeçalho
 
 # Definição dos tipos de mensagem
 MESSAGE_TYPE_DATA = 0x01
@@ -33,6 +33,8 @@ class Packet:
 
     def to_bytes(self):
         header = struct.pack('!B H B', self.message_type, self.seq_num, self.crc)
+        print(f'header: {len(header)}')
+        print(f'data: {len(self.data)}')
         return header + self.data
 
     @staticmethod
