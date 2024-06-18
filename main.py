@@ -1,8 +1,5 @@
 import socket
-
 import os
-
-
 import hashlib
 
 from client import client
@@ -13,7 +10,7 @@ if __name__ == "__main__":
     from threading import Thread
 
     if len(sys.argv) != 3:
-        print("Usage: python transfer.py <client/server> <file_path>")
+        print("Usage: python main.py <client/server> <file_path>")
         sys.exit(1)
 
     role = sys.argv[1]
@@ -22,6 +19,6 @@ if __name__ == "__main__":
     if role == "client":
         client(file_path)
     elif role == "server":
-        server()
+        server(file_path)
     else:
         print("Invalid role. Choose 'client' or 'server'.")

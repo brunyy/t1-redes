@@ -1,43 +1,52 @@
 import socket
-import zlib
-import random
 import time
-import struct
+import random
+from packet import Packet, PACKET_SIZE, DATA_SIZE, MESSAGE_TYPE_DATA, MESSAGE_TYPE_ACK, MESSAGE_TYPE_FIN, MESSAGE_TYPE_SYN, MESSAGE_TYPE_SYN_ACK
 
+# Constantes de configuração
 SERVER_IP = "127.0.0.1"
 SERVER_PORT = 12345
 CLIENT_PORT = 54321
+TIMEOUT = 2  # Timeout em segundos
+MAX_RETRIES = 5  # Número máximo de tentativas de retransmissão
+LOSS_PROBABILITY = 0.1  # Probabilidade de perda de pacotes (para simulação de erros)
+
 # Estados do congestionamento
 SLOW_START = 0
 CONGESTION_AVOIDANCE = 1
+
+# Tamanho da janela de congestionamento inicial e limite
 INITIAL_CWND = 1
 CWND_LIMIT = 16
 
-MAX_RETRIES = 5   # Número máximo de tentativas de retransmissão
-LOSS_PROBABILITY = 0.1  # Probabilidade de perda de pacotes (para simulação de erros)
-
-TIMEOUT = 2       # Timeout em segundos
-
-PACKET_SIZE = 10  # Tamanho do pacote em bytes
-
-def calculate_crc(data):
-    return zlib.crc32(data)
-
-def create_packet(seq_num, data):
-    crc = calculate_crc(data)
-    header = struct.pack('!I I', seq_num, crc)
-    return header + data
-
 def client(file_path):
-    # Estabelecimento da conexão
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(("", CLIENT_PORT))
     sock.settimeout(TIMEOUT)
 
+    # Estabelecimento da conexão (three-way handshake)
+    syn_packet = Packet(MESSAGE_TYPE_SYN, 0)
+    sock.sendto(syn_packet.to_bytes(), (SERVER_IP, SERVER_PORT))
+    print("Sent SYN")
+
+    while True:
+        try:
+            syn_ack_packet, _ = sock.recvfrom(PACKET_SIZE)
+            syn_ack = Packet.from_bytes(syn_ack_packet)
+            if syn_ack.message_type == MESSAGE_TYPE_SYN_ACK:
+                print("Received SYN-ACK")
+                ack_packet = Packet(MESSAGE_TYPE_ACK, 1)
+                sock.sendto(ack_packet.to_bytes(), (SERVER_IP, SERVER_PORT))
+                print("Sent ACK, connection established")
+                break
+        except socket.timeout:
+            print("Timeout, resending SYN")
+            sock.sendto(syn_packet.to_bytes(), (SERVER_IP, SERVER_PORT))
+
     with open(file_path, "rb") as file:
         file_data = file.read()
 
-    total_packets = (len(file_data) + PACKET_SIZE - 1) // PACKET_SIZE
+    total_packets = (len(file_data) + DATA_SIZE - 1) // DATA_SIZE
     base = 0
     next_seq_num = 0
     cwnd = INITIAL_CWND
@@ -48,13 +57,13 @@ def client(file_path):
 
         # Envio dos pacotes dentro da janela de congestionamento
         while next_seq_num < base + cwnd and next_seq_num < total_packets:
-            start = next_seq_num * PACKET_SIZE
-            end = start + PACKET_SIZE
-            data = file_data[start:end].ljust(PACKET_SIZE, b'\0')
-            packet = create_packet(next_seq_num, data)
+            start = next_seq_num * DATA_SIZE
+            end = start + DATA_SIZE
+            data = file_data[start:end]
+            packet = Packet(MESSAGE_TYPE_DATA, next_seq_num, data)
 
             if random.random() >= LOSS_PROBABILITY:
-                sock.sendto(packet, (SERVER_IP, SERVER_PORT))
+                sock.sendto(packet.to_bytes(), (SERVER_IP, SERVER_PORT))
                 print(f"Sent packet {next_seq_num}")
             else:
                 print(f"Simulating loss for packet {next_seq_num}")
@@ -65,19 +74,21 @@ def client(file_path):
         # Recepção de ACKs e controle de congestionamento
         try:
             while base < next_seq_num:
-                ack_packet, _ = sock.recvfrom(8)
-                ack_num, _ = struct.unpack('!I I', ack_packet)
-                print(f"Received ACK {ack_num}")
+                ack_packet, _ = sock.recvfrom(PACKET_SIZE)
+                ack = Packet.from_bytes(ack_packet)
+                if ack.message_type == MESSAGE_TYPE_ACK:
+                    ack_num = ack.seq_num
+                    print(f"Received ACK {ack_num}")
 
-                if ack_num > base:
-                    base = ack_num
-                    if state == SLOW_START:
-                        cwnd *= 2
-                        if cwnd >= CWND_LIMIT:
-                            state = CONGESTION_AVOIDANCE
-                            cwnd = CWND_LIMIT
-                    elif state == CONGESTION_AVOIDANCE:
-                        cwnd += 1
+                    if ack_num >= base:
+                        base = ack_num + 1
+                        if state == SLOW_START:
+                            cwnd *= 2
+                            if cwnd >= CWND_LIMIT:
+                                state = CONGESTION_AVOIDANCE
+                                cwnd = CWND_LIMIT
+                        elif state == CONGESTION_AVOIDANCE:
+                            cwnd += 1
 
         except socket.timeout:
             # Timeout: retransmit all packets in the window
@@ -87,6 +98,7 @@ def client(file_path):
             state = SLOW_START
 
     # Envio do pacote de encerramento da conexão
-    sock.sendto(b'FIN', (SERVER_IP, SERVER_PORT))
+    fin_packet = Packet(MESSAGE_TYPE_FIN, 0)
+    sock.sendto(fin_packet.to_bytes(), (SERVER_IP, SERVER_PORT))
     print("Connection closed")
     sock.close()

@@ -1,23 +1,13 @@
 import socket
-import zlib
+import os
+import hashlib
+from packet import Packet, PACKET_SIZE, MESSAGE_TYPE_ACK, MESSAGE_TYPE_FIN, MESSAGE_TYPE_SYN, MESSAGE_TYPE_SYN_ACK
 
 SERVER_IP = "127.0.0.1"
 SERVER_PORT = 12345
+CLIENT_PORT = 54321
 
-def calculate_crc(data):
-    return zlib.crc32(data)
-
-def is_packet_corrupted(packet):
-    seq_num, crc, data = parse_packet(packet)
-    return crc != calculate_crc(data)
-
-def parse_packet(packet):
-    header = packet[:8]
-    data = packet[8:]
-    seq_num, crc = struct.unpack('!I I', header)
-    return seq_num, crc, data    
-
-def server():
+def server(file_path):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((SERVER_IP, SERVER_PORT))
 
@@ -25,24 +15,39 @@ def server():
     received_data = b""
 
     while True:
-        packet, addr = sock.recvfrom(1024)
+        packet_bytes, addr = sock.recvfrom(PACKET_SIZE)
+        packet = Packet.from_bytes(packet_bytes)
 
-        if packet == b'FIN':
+        if packet.message_type == MESSAGE_TYPE_SYN:
+            print("Received SYN")
+            syn_ack_packet = Packet(MESSAGE_TYPE_SYN_ACK, 0)
+            sock.sendto(syn_ack_packet.to_bytes(), addr)
+            print("Sent SYN-ACK")
+            continue
+
+        if packet.message_type == MESSAGE_TYPE_ACK and packet.seq_num == 1:
+            print("Received ACK, connection established")
+            break
+
+    while True:
+        packet_bytes, addr = sock.recvfrom(PACKET_SIZE)
+        packet = Packet.from_bytes(packet_bytes)
+
+        if packet.message_type == MESSAGE_TYPE_FIN:
             print("Received FIN, closing connection")
             break
 
-        if is_packet_corrupted(packet):
+        if packet.is_corrupted():
             print("Corrupted packet received, discarding")
             continue
 
-        seq_num, _, data = parse_packet(packet)
-        if seq_num == expected_seq_num:
-            received_data += data.rstrip(b'\0')
+        if packet.seq_num == expected_seq_num:
+            received_data += packet.data.rstrip(b'\0')
             expected_seq_num += 1
 
-        ack_packet = struct.pack('!I I', expected_seq_num, 0)
-        sock.sendto(ack_packet, addr)
-        print(f"Sent ACK {expected_seq_num}")
+        ack_packet = Packet(MESSAGE_TYPE_ACK, expected_seq_num - 1)
+        sock.sendto(ack_packet.to_bytes(), addr)
+        print(f"Sent ACK {expected_seq_num - 1}")
 
     with open("received_file", "wb") as file:
         file.write(received_data)
@@ -60,21 +65,3 @@ def server():
         print("File received correctly")
     else:
         print("File corrupted during transfer")
-
-if __name__ == "__main__":
-    import sys
-    from threading import Thread
-
-    if len(sys.argv) != 3:
-        print("Usage: python transfer.py <client/server> <file_path>")
-        sys.exit(1)
-
-    role = sys.argv[1]
-    file_path = sys.argv[2]
-
-    if role == "client":
-        client(file_path)
-    elif role == "server":
-        server()
-    else:
-        print("Invalid role. Choose 'client' or 'server'.")
