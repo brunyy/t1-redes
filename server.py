@@ -42,6 +42,7 @@ def server(file_path):
             continue
 
         if packet.seq_num == expected_seq_num:
+            # Remove o padding
             received_data += packet.data.rstrip(b'\0')
             expected_seq_num += 1
 

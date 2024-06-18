@@ -61,14 +61,15 @@ def client(file_path):
             end = start + DATA_SIZE
             data = file_data[start:end]
             packet = Packet(MESSAGE_TYPE_DATA, next_seq_num, data)
-            print(len(packet.to_bytes()))
 
             if random.random() >= LOSS_PROBABILITY:
                 sock.sendto(packet.to_bytes(), (SERVER_IP, SERVER_PORT))
                 print(f"Sent packet {next_seq_num}")
+
             else:
                 print(f"Simulating loss or corruption for packet {next_seq_num}")
                 if random.random() >= 0.5:
+                    # Simula perda de pacote
                     print(f"Lost packet {next_seq_num}")
                     continue
                 else:
@@ -103,6 +104,7 @@ def client(file_path):
             # Timeout: retransmite todos os pacotes da janela
             print("Timeout, retransmitting packets")
             next_seq_num = base
+            # Retorna para o slow_start
             cwnd = INITIAL_CWND
             state = SLOW_START
 

@@ -15,6 +15,7 @@ class Packet:
     def __init__(self, message_type, seq_num, data=b''):
         self.message_type = message_type
         self.seq_num = seq_num
+        # Padding
         self.data = data.ljust(DATA_SIZE, b'\0')[:DATA_SIZE]
         self.crc = self.calculate_crc()
 
@@ -32,9 +33,11 @@ class Packet:
         return crc
 
     def to_bytes(self):
+        # 1 byte para o tipo da mensagem, 2 para o seq_num e 1 para o crc8
         header = struct.pack('!B H B', self.message_type, self.seq_num, self.crc)
         print(f'header: {len(header)}')
         print(f'data: {len(self.data)}')
+        # 4 bytes de header e 6 de dados, totalizando 10
         return header + self.data
 
     @staticmethod
